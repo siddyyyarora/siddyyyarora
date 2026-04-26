@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Portfolio Optimizer — Modern Portfolio Theory</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg: #050A0E;
+    --surface: #0D1B22;
+    --surface2: #132430;
+    --border: #1E3545;
+    --accent: #00FFB2;
+    --accent2: #FF6B35;
+    --accent3: #7B61FF;
+    --text: #E8F4F8;
+    --muted: #607D8B;
+    --danger: #FF4757;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,178,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,178,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* HEADER */
+  header {
+    padding: 48px 0 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+
+  .header-tag {
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    opacity: 0.8;
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(32px, 5vw, 64px);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -2px;
+    color: var(--text);
+  }
+
+  h1 span {
+    color: var(--accent);
+  }
+
+  .header-meta {
+    display: flex;
+    gap: 32px;
+    margin-top: 16px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .header-meta span { display: flex; align-items: center; gap: 6px; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); display: inline-block; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+  /* STATUS BAR */
+  .status-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 20px;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+  }
+
+  .status-indicator {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+  .status-indicator.loading { background: var(--accent2); animation: pulse 1s infinite; }
+  .status-indicator.error { background: var(--danger); }
+
+  /* GRID LAYOUTS */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+
+  @media (max-width: 1100px) { .grid-3 { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 800px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  }
+
+  /* CARD */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    transition: border-color 0.3s;
+  }
+  .card:hover { border-color: rgba(0,255,178,0.3); }
+
+  .card-label {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .card-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .card-value.accent { color: var(--accent); }
+  .card-value.accent2 { color: var(--accent2); }
+  .card-value.accent3 { color: var(--accent3); }
+
+  .card-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  /* SECTION HEADING */
+  .section-heading {
+    font-family: 'Syne', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-heading::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* STOCK TABLE */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    font-family: 'Space Mono', monospace;
+  }
+  td {
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(30,53,69,0.5);
+    font-family: 'Space Mono', monospace;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(0,255,178,0.03); }
+
+  .ticker-badge {
+    display: inline-block;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-weight: 700;
+    color: var(--accent);
+    font-size: 11px;
+  }
+
+  .positive { color: var(--accent); }
+  .negative { color: var(--danger); }
+
+  /* WEIGHT BAR */
+  .weight-bar-wrap { display: flex; align-items: center; gap: 10px; }
+  .weight-bar {
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+    transition: width 1s ease;
+    min-width: 2px;
+  }
+  .weight-val { font-size: 11px; color: var(--text); min-width: 40px; text-align: right; }
+
+  /* CHART CONTAINERS */
+  .chart-container {
+    position: relative;
+    height: 340px;
+    width: 100%;
+  }
+
+  .chart-container-sm {
+    position: relative;
+    height: 280px;
+    width: 100%;
+  }
+
+  /* PORTFOLIO HIGHLIGHT */
+  .portfolio-highlight {
+    background: linear-gradient(135deg, rgba(0,255,178,0.08), rgba(123,97,255,0.08));
+    border: 1px solid rgba(0,255,178,0.25);
+    border-radius: 12px;
+    padding: 28px;
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .portfolio-highlight::before {
+    content: 'OPTIMAL';
+    position: absolute;
+    right: -10px;
+    top: 20px;
+    font-family: 'Syne', sans-serif;
+    font-size: 80px;
+    font-weight: 800;
+    color: rgba(0,255,178,0.04);
+    letter-spacing: -4px;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  .ph-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  .ph-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 20px;
+  }
+
+  .ph-stat-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .ph-stat-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+  }
+
+  /* FOOTER */
+  footer {
+    margin-top: 60px;
+    padding: 32px 0;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .footer-brand {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text);
+  }
+
+  /* LOADING OVERLAY */
+  #loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    gap: 20px;
+  }
+
+  .loader-text {
+    font-family: 'Syne', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .loader-sub {
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 2px;
+  }
+
+  .loader-bar-wrap {
+    width: 280px;
+    height: 2px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .loader-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+    border-radius: 2px;
+    animation: load-anim 2.5s ease forwards;
+  }
+
+  @keyframes load-anim { from { width: 0; } to { width: 100%; } }
+
+  .fade-in { animation: fadeIn 0.6s ease forwards; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  .risk-label {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .risk-low { background: rgba(0,255,178,0.15); color: var(--accent); }
+  .risk-med { background: rgba(255,107,53,0.15); color: var(--accent2); }
+  .risk-high { background: rgba(255,71,87,0.15); color: var(--danger); }
+
+  .divider { margin: 24px 0; border: none; border-top: 1px solid var(--border); }
+
+  /* Sector pill */
+  .sector-pill {
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<div id="loading-overlay">
+  <div class="loader-text">PORTFOLIO OPTIMIZER</div>
+  <div class="loader-sub">Running MPT Analysis · Monte Carlo Simulation</div>
+  <div class="loader-bar-wrap"><div class="loader-bar"></div></div>
+</div>
+
+<div id="main-content" style="display:none;">
+<div class="container">
+
+  <!-- HEADER -->
+  <header>
+    <div class="header-tag">Modern Portfolio Theory · Markowitz Efficient Frontier</div>
+    <h1>Optimal <span>Portfolio</span><br>Analysis</h1>
+    <div class="header-meta">
+      <span><span class="dot"></span> 15 Blue-Chip Stocks</span>
+      <span>·</span>
+      <span>2-Year Historical Data (Simulated)</span>
+      <span>·</span>
+      <span>10,000 Monte Carlo Portfolios</span>
+      <span>·</span>
+      <span id="analysis-date"></span>
+    </div>
+  </header>
+
+  <!-- STATUS -->
+  <div class="status-bar" id="status-bar">
+    <div class="status-indicator" id="status-dot"></div>
+    <span id="status-text">Analysis complete — Optimal portfolio identified via Sharpe Ratio maximization</span>
+  </div>
+
+  <!-- KPI STRIP -->
+  <div class="grid-4" id="kpi-strip"></div>
+
+  <!-- OPTIMAL PORTFOLIO HIGHLIGHT -->
+  <div class="portfolio-highlight fade-in" id="optimal-highlight"></div>
+
+  <!-- CHARTS ROW 1 -->
+  <div class="grid-2">
+    <div class="card fade-in">
+      <div class="section-heading" style="font-size:15px;">Efficient Frontier</div>
+      <div class="chart-container"><canvas id="frontierChart"></canvas></div>
+    </div>
+    <div class="card fade-in">
+      <div class="section-heading" style="font-size:15px;">Optimal Weights</div>
+      <div class="chart-container"><canvas id="weightsChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 2 -->
+  <div class="grid-2">
+    <div class="card fade-in">
+      <div class="section-heading" style="font-size:15px;">Expected Return vs Risk per Stock</div>
+      <div class="chart-container"><canvas id="riskReturnChart"></canvas></div>
+    </div>
+    <div class="card fade-in">
+      <div class="section-heading" style="font-size:15px;">Sharpe Ratio Ranking</div>
+      <div class="chart-container"><canvas id="sharpeChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- STOCK TABLE -->
+  <div class="card fade-in" style="margin-bottom: 20px;">
+    <div class="section-heading">Individual Stock Metrics</div>
+    <div class="table-wrap">
+      <table id="stock-table">
+        <thead>
+          <tr>
+            <th>Ticker</th>
+            <th>Company</th>
+            <th>Sector</th>
+            <th>Ann. Return</th>
+            <th>Ann. Volatility</th>
+            <th>Sharpe Ratio</th>
+            <th>Beta</th>
+            <th>Risk Level</th>
+            <th>Opt. Weight</th>
+          </tr>
+        </thead>
+        <tbody id="stock-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- WEIGHTS TABLE -->
+  <div class="card fade-in" style="margin-bottom: 20px;">
+    <div class="section-heading">Optimal Portfolio Allocation</div>
+    <div id="weights-bars"></div>
+  </div>
+
+  <!-- CORRELATION HEATMAP -->
+  <div class="card fade-in" style="margin-bottom: 20px;">
+    <div class="section-heading">Correlation Matrix (Heatmap)</div>
+    <div id="heatmap-container" style="overflow-x:auto;"></div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div>
+      <div class="footer-brand">Portfolio Optimizer</div>
+      <div style="margin-top:4px;">Built with Modern Portfolio Theory · Markowitz (1952)</div>
+    </div>
+    <div style="text-align:right;">
+      Data: Simulated 2-year daily returns · Risk-free rate: 5.25% (US Fed Funds)<br>
+      Optimization: Max Sharpe Ratio via Monte Carlo (10,000 portfolios)
+    </div>
+  </footer>
+
+</div><!-- /container -->
+</div><!-- /main-content -->
+
+<script>
+// ─── DATA ────────────────────────────────────────────────────────────────────
+const STOCKS = [
+  { ticker:'AAPL', name:'Apple Inc.',             sector:'Technology',   annReturn:0.2341, vol:0.2612, beta:1.19 },
+  { ticker:'MSFT', name:'Microsoft Corp.',         sector:'Technology',   annReturn:0.2815, vol:0.2289, beta:0.91 },
+  { ticker:'GOOGL',name:'Alphabet Inc.',           sector:'Technology',   annReturn:0.1987, vol:0.2534, beta:1.05 },
+  { ticker:'AMZN', name:'Amazon.com Inc.',         sector:'Consumer Disc.',annReturn:0.3102, vol:0.3145, beta:1.23 },
+  { ticker:'NVDA', name:'NVIDIA Corp.',            sector:'Semiconductors',annReturn:0.6287, vol:0.5421, beta:1.72 },
+  { ticker:'META', name:'Meta Platforms Inc.',     sector:'Technology',   annReturn:0.4123, vol:0.3812, beta:1.31 },
+  { ticker:'TSLA', name:'Tesla Inc.',              sector:'Automotive',   annReturn:0.1534, vol:0.5832, beta:2.01 },
+  { ticker:'JPM',  name:'JPMorgan Chase & Co.',   sector:'Financials',   annReturn:0.1823, vol:0.2134, beta:0.87 },
+  { ticker:'V',    name:'Visa Inc.',               sector:'Financials',   annReturn:0.1612, vol:0.1923, beta:0.95 },
+  { ticker:'JNJ',  name:'Johnson & Johnson',       sector:'Healthcare',   annReturn:0.0834, vol:0.1512, beta:0.52 },
+  { ticker:'UNH',  name:'UnitedHealth Group',      sector:'Healthcare',   annReturn:0.1745, vol:0.2012, beta:0.71 },
+  { ticker:'XOM',  name:'Exxon Mobil Corp.',       sector:'Energy',       annReturn:0.1423, vol:0.2423, beta:0.89 },
+  { ticker:'BRK',  name:'Berkshire Hathaway B',    sector:'Financials',   annReturn:0.1534, vol:0.1734, beta:0.78 },
+  { ticker:'PG',   name:'Procter & Gamble Co.',    sector:'Consumer Stap.',annReturn:0.0923, vol:0.1423, beta:0.48 },
+  { ticker:'HD',   name:'The Home Depot Inc.',     sector:'Consumer Disc.',annReturn:0.1687, vol:0.2234, beta:1.04 },
+];
+
+const RF = 0.0525; // Risk-free rate
+
+// Sharpe per stock
+STOCKS.forEach(s => { s.sharpe = (s.annReturn - RF) / s.vol; });
+
+// ─── PORTFOLIO SIMULATION ─────────────────────────────────────────────────────
+// Simplified covariance matrix using betas & sector correlations
+function buildCovMatrix(stocks) {
+  const n = stocks.length;
+  const cov = Array.from({length:n}, ()=>Array(n).fill(0));
+  const marketVar = 0.04; // market variance ~20% vol^2
+
+  for (let i=0;i<n;i++) {
+    for (let j=0;j<n;j++) {
+      if (i===j) {
+        cov[i][j] = stocks[i].vol**2;
+      } else {
+        // Cov(i,j) ≈ beta_i * beta_j * sigma_m^2 + sector bonus
+        let sectorBonus = stocks[i].sector === stocks[j].sector ? 0.01 : 0;
+        cov[i][j] = stocks[i].beta * stocks[j].beta * marketVar + sectorBonus;
+        // cap at vol product
+        cov[i][j] = Math.min(cov[i][j], stocks[i].vol * stocks[j].vol * 0.85);
+      }
+    }
+  }
+  return cov;
+}
+
+function portfolioStats(weights, returns, cov) {
+  const n = weights.length;
+  let ret = 0;
+  for (let i=0;i<n;i++) ret += weights[i]*returns[i];
+  let variance = 0;
+  for (let i=0;i<n;i++) for (let j=0;j<n;j++) variance += weights[i]*weights[j]*cov[i][j];
+  return { ret, vol: Math.sqrt(variance) };
+}
+
+function randomWeights(n) {
+  const w = Array.from({length:n}, ()=>Math.random());
+  const sum = w.reduce((a,b)=>a+b, 0);
+  return w.map(x=>x/sum);
+}
+
+// Run Monte Carlo
+const N = STOCKS.length;
+const returns = STOCKS.map(s=>s.annReturn);
+const cov = buildCovMatrix(STOCKS);
+
+const MC_PORTFOLIOS = 10000;
+let portfolios = [];
+let bestSharpe = -Infinity, bestIdx = 0;
+let minRisk = Infinity, minRiskIdx = 0;
+
+for (let p=0;p<MC_PORTFOLIOS;p++) {
+  const w = randomWeights(N);
+  const {ret, vol} = portfolioStats(w, returns, cov);
+  const sharpe = (ret - RF) / vol;
+  portfolios.push({w, ret, vol, sharpe});
+  if (sharpe > bestSharpe) { bestSharpe=sharpe; bestIdx=p; }
+  if (vol < minRisk) { minRisk=vol; minRiskIdx=p; }
+}
+
+const OPTIMAL = portfolios[bestIdx];
+const MIN_RISK = portfolios[minRiskIdx];
+
+// For chart display: sample 2000 portfolios
+const sample = portfolios.filter((_,i)=>i%5===0);
+
+// ─── CORRELATION MATRIX ───────────────────────────────────────────────────────
+function buildCorr(stocks) {
+  const n = stocks.length;
+  const corr = Array.from({length:n}, ()=>Array(n).fill(0));
+  for (let i=0;i<n;i++) for (let j=0;j<n;j++) {
+    if (i===j) corr[i][j]=1;
+    else corr[i][j] = Math.min(1, cov[i][j]/(stocks[i].vol*stocks[j].vol));
+  }
+  return corr;
+}
+const corrMatrix = buildCorr(STOCKS);
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+document.getElementById('analysis-date').textContent = new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+
+// KPIs
+const kpis = [
+  { label:'Max Sharpe Ratio', value: OPTIMAL.sharpe.toFixed(2), cls:'accent', sub:'Optimal portfolio' },
+  { label:'Expected Return', value: (OPTIMAL.ret*100).toFixed(1)+'%', cls:'accent', sub:'Annualized' },
+  { label:'Portfolio Volatility', value: (OPTIMAL.vol*100).toFixed(1)+'%', cls:'accent2', sub:'Annualized std dev' },
+  { label:'Min-Risk Portfolio', value: (MIN_RISK.vol*100).toFixed(1)+'%', cls:'accent3', sub:'Minimum variance' },
+];
+const kpiStrip = document.getElementById('kpi-strip');
+kpis.forEach(k=>{
+  kpiStrip.innerHTML += `<div class="card">
+    <div class="card-label">${k.label}</div>
+    <div class="card-value ${k.cls}">${k.value}</div>
+    <div class="card-sub">${k.sub}</div>
+  </div>`;
+});
+
+// Optimal highlight
+const oh = document.getElementById('optimal-highlight');
+oh.innerHTML = `<div class="ph-title">⬡ Max Sharpe Optimal Portfolio</div>
+<div class="ph-stats">
+  <div><div class="ph-stat-label">Expected Annual Return</div><div class="ph-stat-value positive">${(OPTIMAL.ret*100).toFixed(2)}%</div></div>
+  <div><div class="ph-stat-label">Annual Volatility (Risk)</div><div class="ph-stat-value" style="color:var(--accent2)">${(OPTIMAL.vol*100).toFixed(2)}%</div></div>
+  <div><div class="ph-stat-label">Sharpe Ratio</div><div class="ph-stat-value accent">${OPTIMAL.sharpe.toFixed(3)}</div></div>
+  <div><div class="ph-stat-label">Risk-Free Rate</div><div class="ph-stat-value" style="color:var(--muted)">${(RF*100).toFixed(2)}%</div></div>
+  <div><div class="ph-stat-label">Excess Return</div><div class="ph-stat-value positive">${((OPTIMAL.ret-RF)*100).toFixed(2)}%</div></div>
+  <div><div class="ph-stat-label">Stocks in Portfolio</div><div class="ph-stat-value" style="color:var(--accent3)">${OPTIMAL.w.filter(x=>x>0.01).length}</div></div>
+</div>`;
+
+// Stock table
+const tbody = document.getElementById('stock-tbody');
+const sortedByWeight = [...STOCKS.map((s,i)=>({...s, weight:OPTIMAL.w[i]}))].sort((a,b)=>b.weight-a.weight);
+
+sortedByWeight.forEach(s=>{
+  const riskClass = s.vol < 0.20 ? 'risk-low' : s.vol < 0.35 ? 'risk-med' : 'risk-high';
+  const riskLabel = s.vol < 0.20 ? 'Low' : s.vol < 0.35 ? 'Medium' : 'High';
+  tbody.innerHTML += `<tr>
+    <td><span class="ticker-badge">${s.ticker}</span></td>
+    <td>${s.name}</td>
+    <td><span class="sector-pill">${s.sector}</span></td>
+    <td class="${s.annReturn>=0?'positive':'negative'}">${(s.annReturn*100).toFixed(2)}%</td>
+    <td class="accent2">${(s.vol*100).toFixed(2)}%</td>
+    <td class="${s.sharpe>=1?'positive':''}">${s.sharpe.toFixed(3)}</td>
+    <td>${s.beta.toFixed(2)}</td>
+    <td><span class="risk-label ${riskClass}">${riskLabel}</span></td>
+    <td class="positive"><b>${(s.weight*100).toFixed(2)}%</b></td>
+  </tr>`;
+});
+
+// Weight bars
+const wb = document.getElementById('weights-bars');
+sortedByWeight.forEach(s=>{
+  const pct = (s.weight*100).toFixed(2);
+  wb.innerHTML += `<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+    <div style="min-width:50px;font-size:11px;color:var(--accent);font-weight:700;">${s.ticker}</div>
+    <div style="flex:1;background:var(--surface2);border-radius:4px;height:8px;overflow:hidden;">
+      <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent3));border-radius:4px;transition:width 1s ease;"></div>
+    </div>
+    <div style="min-width:48px;text-align:right;font-size:12px;color:var(--text);">${pct}%</div>
+    <div style="min-width:130px;font-size:10px;color:var(--muted);">${s.name.substring(0,20)}</div>
+  </div>`;
+});
+
+// ─── CHARTS ───────────────────────────────────────────────────────────────────
+Chart.defaults.color = '#607D8B';
+Chart.defaults.borderColor = '#1E3545';
+Chart.defaults.font.family = "'Space Mono', monospace";
+
+// 1. EFFICIENT FRONTIER
+const ctx1 = document.getElementById('frontierChart').getContext('2d');
+new Chart(ctx1, {
+  type:'scatter',
+  data:{
+    datasets:[
+      {
+        label:'Simulated Portfolios',
+        data: sample.map(p=>({x:(p.vol*100).toFixed(2), y:(p.ret*100).toFixed(2)})),
+        backgroundColor: sample.map(p=>{
+          const s = (p.sharpe - 0.5) / 2;
+          const t = Math.max(0,Math.min(1,s));
+          return `rgba(${Math.round(255*(1-t))},${Math.round(255*t)},${Math.round(178*t)},0.4)`;
+        }),
+        pointRadius:2,
+      },
+      {
+        label:'Max Sharpe (Optimal)',
+        data:[{x:(OPTIMAL.vol*100).toFixed(2), y:(OPTIMAL.ret*100).toFixed(2)}],
+        backgroundColor:'#00FFB2',
+        pointRadius:12,
+        pointHoverRadius:15,
+        pointStyle:'star',
+      },
+      {
+        label:'Min Variance',
+        data:[{x:(MIN_RISK.vol*100).toFixed(2), y:(MIN_RISK.ret*100).toFixed(2)}],
+        backgroundColor:'#7B61FF',
+        pointRadius:9,
+        pointHoverRadius:12,
+      },
+    ]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{
+      legend:{display:true, labels:{font:{size:11},boxWidth:10}},
+      tooltip:{callbacks:{
+        label: ctx => `${ctx.dataset.label}: Return ${parseFloat(ctx.parsed.y).toFixed(1)}% | Vol ${parseFloat(ctx.parsed.x).toFixed(1)}%`
+      }}
+    },
+    scales:{
+      x:{title:{display:true,text:'Volatility (Risk) %',color:'#607D8B',font:{size:11}}, grid:{color:'rgba(30,53,69,0.6)'}},
+      y:{title:{display:true,text:'Expected Return %',color:'#607D8B',font:{size:11}}, grid:{color:'rgba(30,53,69,0.6)'}},
+    }
+  }
+});
+
+// 2. WEIGHTS DONUT
+const ctx2 = document.getElementById('weightsChart').getContext('2d');
+const topWeights = sortedByWeight.filter(s=>s.weight>0.005);
+const palette = ['#00FFB2','#7B61FF','#FF6B35','#00D4FF','#FF4757','#FFC312','#2ecc71','#e056fd','#f9ca24','#6ab04c','#c0392b','#22a6b3','#be2edd','#f0932b','#95afc0'];
+new Chart(ctx2, {
+  type:'doughnut',
+  data:{
+    labels: topWeights.map(s=>s.ticker),
+    datasets:[{
+      data: topWeights.map(s=>(s.weight*100).toFixed(2)),
+      backgroundColor: palette.slice(0,topWeights.length),
+      borderColor: '#050A0E',
+      borderWidth:3,
+      hoverOffset:8,
+    }]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{
+      legend:{display:true, position:'right', labels:{font:{size:11},boxWidth:12,padding:8}},
+      tooltip:{callbacks:{label: ctx=>`${ctx.label}: ${ctx.parsed.toFixed(2)}%`}}
+    },
+    cutout:'60%',
+  }
+});
+
+// 3. RISK vs RETURN scatter (individual stocks)
+const ctx3 = document.getElementById('riskReturnChart').getContext('2d');
+new Chart(ctx3, {
+  type:'bubble',
+  data:{
+    datasets:[{
+      label:'Stocks',
+      data: STOCKS.map(s=>({
+        x:(s.vol*100).toFixed(1),
+        y:(s.annReturn*100).toFixed(1),
+        r: Math.max(5, OPTIMAL.w[STOCKS.indexOf(s)]*80),
+        ticker:s.ticker
+      })),
+      backgroundColor: STOCKS.map(s=>{
+        const idx = STOCKS.indexOf(s);
+        return palette[idx % palette.length]+'99';
+      }),
+      borderColor: STOCKS.map(s=>{
+        const idx = STOCKS.indexOf(s);
+        return palette[idx % palette.length];
+      }),
+      borderWidth:1.5,
+    }]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{
+      legend:{display:false},
+      tooltip:{callbacks:{
+        label: ctx=>{
+          const s=STOCKS[ctx.dataIndex];
+          return [`${s.ticker} — ${s.name}`, `Return: ${(s.annReturn*100).toFixed(1)}%`, `Volatility: ${(s.vol*100).toFixed(1)}%`, `Opt. Weight: ${(OPTIMAL.w[ctx.dataIndex]*100).toFixed(2)}%`];
+        }
+      }}
+    },
+    scales:{
+      x:{title:{display:true,text:'Volatility (Risk) %',color:'#607D8B',font:{size:11}}, grid:{color:'rgba(30,53,69,0.6)'}},
+      y:{title:{display:true,text:'Expected Return %',color:'#607D8B',font:{size:11}}, grid:{color:'rgba(30,53,69,0.6)'}},
+    }
+  }
+});
+
+// Labels plugin for scatter
+// 4. SHARPE BAR
+const ctx4 = document.getElementById('sharpeChart').getContext('2d');
+const sortedBySharpe = [...STOCKS].sort((a,b)=>b.sharpe-a.sharpe);
+new Chart(ctx4, {
+  type:'bar',
+  data:{
+    labels: sortedBySharpe.map(s=>s.ticker),
+    datasets:[{
+      label:'Sharpe Ratio',
+      data: sortedBySharpe.map(s=>s.sharpe.toFixed(3)),
+      backgroundColor: sortedBySharpe.map(s=>s.sharpe>1?'rgba(0,255,178,0.7)':s.sharpe>0.5?'rgba(255,107,53,0.7)':'rgba(255,71,87,0.6)'),
+      borderColor: sortedBySharpe.map(s=>s.sharpe>1?'#00FFB2':s.sharpe>0.5?'#FF6B35':'#FF4757'),
+      borderWidth:1.5,
+      borderRadius:4,
+    }]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    indexAxis:'y',
+    plugins:{
+      legend:{display:false},
+      tooltip:{callbacks:{label: ctx=>`Sharpe: ${parseFloat(ctx.parsed.x).toFixed(3)}`}}
+    },
+    scales:{
+      x:{title:{display:true,text:'Sharpe Ratio',color:'#607D8B',font:{size:11}}, grid:{color:'rgba(30,53,69,0.6)'}, min:0},
+      y:{grid:{display:false}, ticks:{font:{size:11}}},
+    }
+  }
+});
+
+// ─── HEATMAP ──────────────────────────────────────────────────────────────────
+function corrToColor(v) {
+  // -1=red, 0=dark, +1=green
+  if (v >= 0) {
+    const t = v;
+    return `rgba(0,${Math.round(255*t)},${Math.round(178*t)},${0.2+0.7*t})`;
+  } else {
+    const t = -v;
+    return `rgba(${Math.round(255*t)},${Math.round(71*t)},${Math.round(87*t)},${0.2+0.7*t})`;
+  }
+}
+
+const hc = document.getElementById('heatmap-container');
+const tickers = STOCKS.map(s=>s.ticker);
+let html = `<table style="border-collapse:collapse;font-size:10px;font-family:'Space Mono',monospace;">`;
+html += `<tr><td></td>${tickers.map(t=>`<th style="padding:4px 6px;color:var(--accent);text-align:center;width:46px;">${t}</th>`).join('')}</tr>`;
+for (let i=0;i<STOCKS.length;i++) {
+  html += `<tr><th style="padding:4px 8px;color:var(--accent);text-align:right;white-space:nowrap;">${tickers[i]}</th>`;
+  for (let j=0;j<STOCKS.length;j++) {
+    const v = corrMatrix[i][j];
+    const bg = corrToColor(v);
+    html += `<td title="${tickers[i]} vs ${tickers[j]}: ${v.toFixed(2)}" style="background:${bg};padding:4px 2px;text-align:center;border-radius:2px;cursor:pointer;color:${Math.abs(v)>0.5?'var(--text)':'var(--muted)'};">${v.toFixed(2)}</td>`;
+  }
+  html += `</tr>`;
+}
+html += `</table>`;
+hc.innerHTML = html;
+
+// ─── SHOW CONTENT ─────────────────────────────────────────────────────────────
+setTimeout(()=>{
+  document.getElementById('loading-overlay').style.display='none';
+  document.getElementById('main-content').style.display='block';
+}, 2600);
+</script>
+</body>
+</html>
